@@ -1,0 +1,69 @@
+version: "3"
+services:
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: financial-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+    depends_on:
+      - api
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: financial-api
+    expose:
+      - "9000"
+    working_dir: /var/www/html
+    volumes:
+      - ./api/:/var/www/html
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./logs/php.log:/var/log/fpm-php.www.log
+    depends_on:
+      - db
+    networks:
+      - internal
+
+  db:
+    image: postgres:15
+    restart: always
+    container_name: financial-db
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: 'financial_db'
+      POSTGRES_USER: 'financial'
+      POSTGRES_PASSWORD: 'financial'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:latest
+    container_name: financial-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./logs/nginx:/var/log/nginx/
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+    restart: always
+    depends_on:
+      - api
+      - web
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+volumes:
+  db_data:
+    driver: local
